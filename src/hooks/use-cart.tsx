@@ -1,6 +1,8 @@
 
 import * as React from "react";
 import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export interface Product {
   id: string;
@@ -48,6 +50,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = React.useState<CartItem[]>([]);
   const [savedItems, setSavedItems] = React.useState<SavedItem[]>([]);
   const [wishlist, setWishlist] = React.useState<Product[]>([]);
+  const { user, isAuthenticated } = useAuth();
 
   // Load from localStorage on initial render
   React.useEffect(() => {
@@ -59,6 +62,45 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
     if (savedForLater) setSavedItems(JSON.parse(savedForLater));
   }, []);
+
+  // Fetch user's wishlist from Supabase when authenticated
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      const fetchWishlist = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('wishlists')
+            .select('product_id, products(*)')
+            .eq('user_id', user.id);
+          
+          if (error) {
+            console.error("Error fetching wishlist:", error);
+            return;
+          }
+          
+          if (data && data.length > 0) {
+            const wishlistItems = data.map(item => ({
+              id: item.products.id,
+              name: item.products.name,
+              description: item.products.description,
+              price: item.products.price,
+              image: item.products.image,
+              category: item.products.category,
+              rating: item.products.rating,
+              inStock: item.products.instock,
+              fastDelivery: item.products.fastdelivery
+            }));
+            
+            setWishlist(wishlistItems);
+          }
+        } catch (error) {
+          console.error("Failed to fetch wishlist:", error);
+        }
+      };
+      
+      fetchWishlist();
+    }
+  }, [isAuthenticated, user]);
 
   // Save to localStorage whenever cart, wishlist, or savedItems change
   React.useEffect(() => {
@@ -129,19 +171,64 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     toast("Cart cleared");
   };
 
-  const addToWishlist = (product: Product) => {
+  const addToWishlist = async (product: Product) => {
     const isAlreadyInWishlist = wishlist.some(item => item.id === product.id);
     
     if (!isAlreadyInWishlist) {
+      // Add to local state
       setWishlist(prev => [...prev, product]);
+      
+      // Add to Supabase if authenticated
+      if (isAuthenticated && user) {
+        try {
+          const { error } = await supabase
+            .from('wishlists')
+            .insert({
+              user_id: user.id,
+              product_id: product.id
+            });
+          
+          if (error) {
+            console.error("Error adding to wishlist:", error);
+            if (error.code !== '23505') { // Not a duplicate entry error
+              // Roll back the local state change
+              setWishlist(prev => prev.filter(item => item.id !== product.id));
+              throw error;
+            }
+          }
+        } catch (error) {
+          console.error("Failed to add to wishlist:", error);
+          toast.error("Failed to add to wishlist. Please try again.");
+          return;
+        }
+      }
+      
       toast(`${product.name} added to wishlist`);
     } else {
       removeFromWishlist(product.id);
     }
   };
 
-  const removeFromWishlist = (productId: string) => {
+  const removeFromWishlist = async (productId: string) => {
+    // Remove from local state
     setWishlist(prev => prev.filter(item => item.id !== productId));
+    
+    // Remove from Supabase if authenticated
+    if (isAuthenticated && user) {
+      try {
+        const { error } = await supabase
+          .from('wishlists')
+          .delete()
+          .match({ user_id: user.id, product_id: productId });
+        
+        if (error) {
+          console.error("Error removing from wishlist:", error);
+        }
+      } catch (error) {
+        console.error("Failed to remove from wishlist:", error);
+      }
+    }
+    
     toast("Item removed from wishlist");
   };
 

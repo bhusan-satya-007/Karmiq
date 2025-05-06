@@ -3,7 +3,6 @@ import * as React from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { ProductGrid } from "@/components/product/product-grid";
-import { products, categories } from "@/data/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -16,18 +15,44 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Product } from "@/hooks/use-cart";
+import { useQuery } from "@tanstack/react-query";
+import { fetchProducts } from "@/services/products";
+import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
 
 const ProductsPage = () => {
-  const [filteredProducts, setFilteredProducts] = React.useState<Product[]>(products);
+  const { data: allProducts, isLoading, error } = useQuery({
+    queryKey: ['products'],
+    queryFn: fetchProducts
+  });
+
+  const [filteredProducts, setFilteredProducts] = React.useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = React.useState<string>("All");
-  const [priceRange, setPriceRange] = React.useState<[number, number]>([0, 300]);
+  const [priceRange, setPriceRange] = React.useState<[number, number]>([0, 1500]);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [sort, setSort] = React.useState<string>("featured");
   const [showFilters, setShowFilters] = React.useState<boolean>(false);
+  const [categories, setCategories] = React.useState<string[]>(["All"]);
+
+  // Get unique categories from products
+  React.useEffect(() => {
+    if (allProducts) {
+      const uniqueCategories = ["All", ...new Set(allProducts.map(p => p.category))];
+      setCategories(uniqueCategories);
+
+      // Initialize price range based on min and max product prices
+      const prices = allProducts.map(p => p.price);
+      const minPrice = Math.floor(Math.min(...prices));
+      const maxPrice = Math.ceil(Math.max(...prices));
+      setPriceRange([minPrice, maxPrice]);
+    }
+  }, [allProducts]);
 
   // Filter and sort products when any filter changes
   React.useEffect(() => {
-    let result = [...products];
+    if (!allProducts) return;
+    
+    let result = [...allProducts];
     
     // Filter by category
     if (selectedCategory !== "All") {
@@ -67,7 +92,53 @@ const ProductsPage = () => {
     }
     
     setFilteredProducts(result);
-  }, [selectedCategory, priceRange, searchQuery, sort]);
+  }, [allProducts, selectedCategory, priceRange, searchQuery, sort]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1 py-8">
+          <div className="container">
+            <div className="mb-8">
+              <Skeleton className="h-10 w-1/4" />
+              <Skeleton className="h-4 w-2/3 mt-2" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array(8).fill(0).map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="aspect-square w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !allProducts) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1 py-8">
+          <div className="container text-center">
+            <h1 className="text-2xl font-bold mb-4">Error Loading Products</h1>
+            <p className="mb-6 text-muted-foreground">
+              There was an error loading the products. Please try again later.
+            </p>
+            <Button onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -107,9 +178,9 @@ const ProductsPage = () => {
                 <h3 className="font-medium mb-3">Price Range</h3>
                 <div className="px-2">
                   <Slider
-                    defaultValue={[0, 300]}
+                    defaultValue={priceRange}
                     min={0}
-                    max={300}
+                    max={1500}
                     step={10}
                     value={priceRange}
                     onValueChange={(value) => setPriceRange(value as [number, number])}
@@ -189,9 +260,9 @@ const ProductsPage = () => {
                     <h3 className="font-medium mb-2">Price Range</h3>
                     <div className="px-2">
                       <Slider
-                        defaultValue={[0, 300]}
+                        defaultValue={priceRange}
                         min={0}
-                        max={300}
+                        max={1500}
                         step={10}
                         value={priceRange}
                         onValueChange={(value) => setPriceRange(value as [number, number])}
@@ -217,7 +288,7 @@ const ProductsPage = () => {
                   <Button
                     onClick={() => {
                       setSelectedCategory("All");
-                      setPriceRange([0, 300]);
+                      setPriceRange([0, 1500]);
                       setSearchQuery("");
                       setSort("featured");
                     }}
