@@ -20,8 +20,8 @@ export async function fetchProducts(): Promise<Product[]> {
     image: item.image,
     category: item.category,
     rating: item.rating,
-    inStock: item.inStock,
-    fastDelivery: item.fastDelivery
+    inStock: item.instock,
+    fastDelivery: item.fastdelivery
   }));
 }
 
@@ -48,8 +48,8 @@ export async function fetchProductById(id: string): Promise<Product | null> {
     image: data.image,
     category: data.category,
     rating: data.rating,
-    inStock: data.inStock,
-    fastDelivery: data.fastDelivery
+    inStock: data.instock,
+    fastDelivery: data.fastdelivery
   };
 }
 
@@ -73,8 +73,8 @@ export async function fetchFeaturedProducts(): Promise<Product[]> {
     image: item.image,
     category: item.category,
     rating: item.rating,
-    inStock: item.inStock,
-    fastDelivery: item.fastDelivery
+    inStock: item.instock,
+    fastDelivery: item.fastdelivery
   }));
 }
 
@@ -98,7 +98,7 @@ export async function fetchProductsByCategory(category: string): Promise<Product
     image: item.image,
     category: item.category,
     rating: item.rating,
-    inStock: item.inStock,
-    fastDelivery: item.fastDelivery
+    inStock: item.instock,
+    fastDelivery: item.fastdelivery
   }));
 }
